@@ -2,7 +2,7 @@ const { Client, GatewayIntentBits } = require('discord.js');
 const nodemailer = require('nodemailer');
 const express = require('express');
 
-// ① Webサーバー設定 (GASで叩き起こすための受け皿)
+// ① Webサーバー設定 (GASで叩き起こすための受け
 const app = express();
 app.get('/', (req, res) => res.send('Bot is awake!'));
 app.listen(process.env.PORT || 3000, () => console.log('Web server is ready.'));
