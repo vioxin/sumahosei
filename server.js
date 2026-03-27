@@ -18,7 +18,7 @@ app.post('/incoming-email', async (req, res) => {
 
         // Discordの指定チャンネルを探して発言！
         const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
-        await channel.send(`📧 **スマホからメールが届きました！**\n\`\`\`\n${mailBody.substring(0, 1900)}\n\`\`\``);
+        await channel.send(mailBody.trim().substring(0, 2000));
 
         // CloudMailinに「無事受け取ったよ！」と返事（これがないとエラー扱いになる）
         res.status(200).send('OK');
