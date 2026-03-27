@@ -1,12 +1,37 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const express = require('express');
 
-// ① Webサーバー設定 (GASで叩き起こすための受け皿)
+// ---------- 【準備】Webサーバー（受け入れ窓口） ----------
 const app = express();
+// CloudMailinからの荷物（JSON）を開けるためのハサミ
+app.use(express.json({ limit: '10mb' }));
+
 app.get('/', (req, res) => res.send('Bot is awake!'));
+
+// ---------- 【第2形態】スマホ(メール) ➔ Discord ----------
+// CloudMailinがメールを受け取ると、ここのドアを猛ダッシュでノックします
+app.post('/incoming-email', async (req, res) => {
+    try {
+        // メールの送信者と本文を抜き出す
+        const fromEmail = req.body.envelope.from;
+        const mailBody = req.body.plain || "本文なし";
+
+        // Discordの指定チャンネルを探して発言！
+        const channel = await client.channels.fetch(process.env.DISCORD_CHANNEL_ID);
+        await channel.send(`📧 **スマホからメールが届きました！**\n\`\`\`\n${mailBody.substring(0, 1900)}\n\`\`\``);
+
+        // CloudMailinに「無事受け取ったよ！」と返事（これがないとエラー扱いになる）
+        res.status(200).send('OK');
+    } catch (error) {
+        console.error('受信エラー:', error);
+        res.status(500).send('Error');
+    }
+});
+
+// サーバー起動
 app.listen(process.env.PORT || 3000, () => console.log('Web server is ready.'));
 
-// ② Discord Bot設定
+// ---------- 【第1形態】Discord ➔ スマホ(メール) ----------
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -19,35 +44,29 @@ client.on('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
 });
 
-// ③ Discordからメッセージが来たらGAS経由でメールを送る！
 client.on('messageCreate', async message => {
-    // Bot自身の発言や、指定したチャンネル以外は無視
+    // Bot自身の発言は無視する（無限ループ防止）
     if (message.author.bot) return;
     if (message.channelId !== process.env.DISCORD_CHANNEL_ID) return;
 
-    // GASの抜け道へ渡す荷物（データ）を準備
     const payload = {
-        to: process.env.MY_IPHONE_EMAIL, // あなたのiPhoneのメアド
-        subject: `[Discord] ${message.author.username}`, // 件名
-        body: message.content // メッセージ本文
+        to: process.env.MY_IPHONE_EMAIL,
+        subject: `[Discord] ${message.author.username}`,
+        body: message.content
     };
 
     try {
-        // GASの魔法のURLに向かって荷物を投げる！
         const response = await fetch(process.env.GAS_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-
         const result = await response.text();
-        console.log('GASからの返事:', result); // 成功すれば Success! と出るはず
+        console.log('GASからの返事:', result);
     } catch (error) {
         console.error('GAS通信エラー:', error);
     }
 });
 
-// Botを起動！
+// Botをログインさせる
 client.login(process.env.DISCORD_TOKEN);
